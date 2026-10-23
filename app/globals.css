@@ -19,3 +19,4 @@ button { cursor: pointer; }
 :focus-visible { outline: 2px solid #796d50; outline-offset: 2px; }
 input, textarea, select { color: rgb(var(--foreground)); }
 input::placeholder, textarea::placeholder { color: rgb(var(--muted)); }
+.onboarding-muted { color: rgb(var(--muted)); }

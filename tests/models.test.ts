@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { seedData, emptyData, STORAGE_KEY, RECOVERY_KEY, LocalStillroomRepository } from "@/lib/repositories/localRepository";
-import { itemTypeTab } from "@/components/StillroomApp";
+import { itemTypeTab, shouldShowOnboarding } from "@/components/StillroomApp";
 import { contrastRatio } from "@/lib/contrast";
 
 class MemoryStorage implements Storage {
@@ -34,6 +34,12 @@ describe("Stillroom repository", () => {
     const task = seedData.items[0];
     const moved = await repo.updateItem({ ...task, spaceId: "studio" });
     expect(moved.spaceId).toBe("studio");
+  });
+
+  it("shows onboarding only for a fresh workspace without storage warnings", () => {
+    expect(shouldShowOnboarding(true, false)).toBe(true);
+    expect(shouldShowOnboarding(false, false)).toBe(false);
+    expect(shouldShowOnboarding(true, true)).toBe(false);
   });
 
   it("routes each created item type to its content tab", () => {
