@@ -20,3 +20,10 @@ button { cursor: pointer; }
 input, textarea, select { color: rgb(var(--foreground)); }
 input::placeholder, textarea::placeholder { color: rgb(var(--muted)); }
 .onboarding-muted { color: rgb(var(--muted)); }
+.onboarding-primary { background: #47423E; border: 1px solid #47423E; color: #FFFDF7; transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease; }
+.onboarding-primary:hover { background: #575149; border-color: #575149; }
+.onboarding-primary:active { background: #39352F; border-color: #39352F; transform: translateY(1px); }
+.dark .onboarding-primary { background: #B2B8A8; border-color: #B2B8A8; color: #201E1C; }
+.dark .onboarding-primary:hover { background: #C3C7B9; border-color: #C3C7B9; }
+.dark .onboarding-primary:active { background: #A4AA98; border-color: #A4AA98; transform: translateY(1px); }
+.onboarding-primary:focus-visible { outline-color: rgb(var(--foreground)); }
