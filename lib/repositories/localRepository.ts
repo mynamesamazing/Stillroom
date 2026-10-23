@@ -4,7 +4,7 @@ import { isAppData, normalizeAppData } from "./schema";
 
 export const STORAGE_KEY = "stillroom-data-v1";
 export const RECOVERY_KEY = "stillroom-data-v1-recovery";
-export const emptyData: AppData = { spaces: [], items: [], tags: [] };
+export const emptyData: AppData = { spaces: [], items: [], tags: [], schemaVersion: 2, calendarEntries: [], dayPortraits: [], captureEntries: [] };
 
 export const seedData: AppData = {
   spaces: [
@@ -19,7 +19,11 @@ export const seedData: AppData = {
     { id: "task-archive", ownerId: null, spaceId: "studio", type: "task", title: "Sort reference archive", description: "Group images by material and season.", completed: false, priority: "medium", pinned: true, createdAt: "2026-10-18T09:00:00.000Z", updatedAt: "2026-10-18T09:00:00.000Z" },
     { id: "link-reading", ownerId: null, spaceId: "studio", type: "link", title: "Material references", url: "https://example.com/materials", notes: "", tagIds: [], pinned: false, createdAt: "2026-10-17T09:00:00.000Z", updatedAt: "2026-10-17T09:00:00.000Z" }
   ],
-  tags: []
+  tags: [],
+  schemaVersion: 2,
+  calendarEntries: [],
+  dayPortraits: [],
+  captureEntries: [],
 };
 
 export class LocalStillroomRepository implements StillroomRepository {

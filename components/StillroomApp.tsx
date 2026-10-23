@@ -2,10 +2,14 @@
 
 import React, { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Archive, ArrowDown, ArrowUp, BookOpen, Briefcase, Check, ChevronDown, Heart, Home, Leaf, Moon, Palette, Pin, PinOff, Plus, Search, Sun, Trash2, X } from "lucide-react";
-import { AppData, ContentItem, ItemType, ListEntry, Space, SpaceIcon, Tag, createId, now } from "@/lib/models";
+import { AppData, CalendarEntry, CaptureEntry, ContentItem, DayPortrait, ItemType, ListEntry, Space, SpaceIcon, Tag, createId, now } from "@/lib/models";
 import { repository, seedData } from "@/lib/repositories/localRepository";
 import { HabitTracker } from "@/components/HabitTracker";
 import { normalizeTagName, normalizeTagRegistry, suggestedTags } from "@/lib/tags";
+import { HomeDashboard } from "@/components/HomeDashboard";
+import { CalendarWorkspace } from "@/components/CalendarWorkspace";
+import { CaptureWorkspace } from "@/components/CaptureWorkspace";
+import { localDateKey } from "@/lib/dates";
 
 const icons = { home: Home, book: BookOpen, palette: Palette, heart: Heart, briefcase: Briefcase, leaf: Leaf };
 const accents = ["#9B6849", "#5F7257", "#A76A76", "#62758C", "#A27B43", "#77705E"];
@@ -16,7 +20,7 @@ export const shouldShowOnboarding = (isNewWorkspace: boolean, hasStorageWarning:
 export function StillroomApp() {
   const [data, setData] = useState<AppData>(seedData);
   const [loaded, setLoaded] = useState(false);
-  const [view, setView] = useState<"library" | "space" | "home" | "calendar">("library");
+  const [view, setView] = useState<"library" | "space" | "home" | "calendar" | "capture">("home");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [showArchived, setShowArchived] = useState(false);
@@ -28,6 +32,8 @@ export function StillroomApp() {
   const [storageWarning, setStorageWarning] = useState<string | null>(null);
   const [storageWritesBlocked, setStorageWritesBlocked] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [calendarDate, setCalendarDate] = useState(() => localDateKey(new Date()));
+  const [newItemDate, setNewItemDate] = useState<string | undefined>();
 
   useEffect(() => { repository.load().then(result => { setData(result.data); setStorageWarning(result.warning?.message ?? null); setStorageWritesBlocked(result.warning?.code === "invalid-json" || result.warning?.code === "malformed-data" || result.warning?.code === "read-error"); setShowOnboarding(result.isNewWorkspace); setLoaded(true); }).catch(error => { setStorageWarning(error instanceof Error ? error.message : "Stillroom could not access browser storage."); setStorageWritesBlocked(true); setLoaded(true); }); }, []);
 
@@ -49,9 +55,9 @@ export function StillroomApp() {
     } catch (error) { setStorageWarning(error instanceof Error ? error.message : "Stillroom could not save this Space."); }
   };
   const persistData = async (next: AppData, failureMessage: string) => {
-    if (storageWritesBlocked) { setStorageWarning("Stillroom preserved existing unreadable data. Resolve the recovery warning before saving changes."); return; }
-    try { await repository.save(next); setData(next); setStorageWarning(null); }
-    catch (error) { setStorageWarning(error instanceof Error ? error.message : failureMessage); }
+    if (storageWritesBlocked) { setStorageWarning("Stillroom preserved existing unreadable data. Resolve the recovery warning before saving changes."); return false; }
+    try { await repository.save(next); setData(next); setStorageWarning(null); return true; }
+    catch (error) { setStorageWarning(error instanceof Error ? error.message : failureMessage); return false; }
   };
   const reorder = async (id: string, direction: -1 | 1) => {
     const activeSpaces = data.spaces.filter(s => !s.archived).sort((a, b) => a.sortOrder - b.sortOrder);
@@ -75,8 +81,8 @@ export function StillroomApp() {
       await repository.save(next);
       setData(next);
       setStorageWarning(null);
-      if (!exists) setCreatedTab(saved.type);
-      setItemEditor(null); setNewItemType(null);
+      if (!exists && view === "space") setCreatedTab(saved.type);
+      setItemEditor(null); setNewItemType(null); setNewItemDate(undefined);
     } catch (error) { setStorageWarning(error instanceof Error ? error.message : "Stillroom could not save this item."); }
   };
   const deleteItem = async (id: string) => {
@@ -88,6 +94,35 @@ export function StillroomApp() {
       setData(next); setStorageWarning(null); setItemEditor(null);
     } catch (error) { setStorageWarning(error instanceof Error ? error.message : "Stillroom could not delete this item."); }
   };
+  const saveCalendarEntry = (entry: CalendarEntry) => {
+    const records = data.calendarEntries ?? [];
+    const next = { ...data, calendarEntries: records.some(value => value.id === entry.id) ? records.map(value => value.id === entry.id ? entry : value) : [...records, entry] };
+    return persistData(next, "Stillroom could not save this calendar entry.");
+  };
+  const deleteCalendarEntry = (id: string) => {
+    return persistData({ ...data, calendarEntries: (data.calendarEntries ?? []).filter(entry => entry.id !== id) }, "Stillroom could not delete this calendar entry.");
+  };
+  const savePortrait = (portrait: DayPortrait) => {
+    const records = data.dayPortraits ?? [];
+    return persistData({ ...data, dayPortraits: records.some(value => value.date === portrait.date) ? records.map(value => value.date === portrait.date ? portrait : value) : [...records, portrait] }, "Stillroom could not save this day portrait.");
+  };
+  const deletePortrait = (date: string) => {
+    return persistData({ ...data, dayPortraits: (data.dayPortraits ?? []).filter(portrait => portrait.date !== date) }, "Stillroom could not delete this day portrait.");
+  };
+  const saveCapture = async (text: string) => {
+    const timestamp = now();
+    const entry: CaptureEntry = { id: createId(), text, createdAt: timestamp, updatedAt: timestamp };
+    return persistData({ ...data, captureEntries: [...(data.captureEntries ?? []), entry] }, "Stillroom could not save this thought.");
+  };
+  const editCapture = (entry: CaptureEntry) => persistData({ ...data, captureEntries: (data.captureEntries ?? []).map(value => value.id === entry.id ? entry : value) }, "Stillroom could not update this thought.");
+  const deleteCapture = (id: string) => { void persistData({ ...data, captureEntries: (data.captureEntries ?? []).filter(entry => entry.id !== id) }, "Stillroom could not delete this thought."); };
+  const convertCapture = async (entry: CaptureEntry, type: "task" | "note", spaceId: string) => {
+    const timestamp = now();
+    const base = { id: createId(), ownerId: null, spaceId, title: entry.text.trim().split("\n")[0].slice(0, 64) || "From The Catchall", pinned: false, createdAt: timestamp, updatedAt: timestamp };
+    const item: ContentItem = type === "task" ? { ...base, type, description: entry.text, completed: false, priority: "medium" } : { ...base, type, body: entry.text };
+    return persistData({ ...data, items: [...data.items, item] }, "Stillroom could not move this thought into your Space.");
+  };
+  const openTaskEditor = (date?: string) => { setNewItemDate(date); setNewItemType("task"); setItemEditor(null); };
 
   const openSpace = (id: string) => { setActiveId(id); setView("space"); };
   const exploreSamples = async () => {
@@ -108,14 +143,19 @@ export function StillroomApp() {
 
   return <main className="min-h-screen">
     {storageWarning && <div role="status" className="border-b border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-900 dark:bg-red-950 dark:text-red-100 sm:px-5"><div className="mx-auto flex max-w-6xl items-start justify-between gap-4"><span className="min-w-0 flex-1 break-words">{storageWarning}</span><button type="button" onClick={() => setStorageWarning(null)} aria-label="Dismiss storage warning" className="shrink-0 underline underline-offset-4">Dismiss</button></div></div>}
-    <header className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 pt-[calc(1rem+env(safe-area-inset-top))] sm:px-5 sm:py-5 sm:pt-[calc(1.25rem+env(safe-area-inset-top))] md:px-8 md:py-5">
-      <button onClick={() => setView("home") } className="font-editorial text-3xl font-semibold tracking-wide">Stillroom</button>
+    <header className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-4 py-4 pt-[calc(1rem+env(safe-area-inset-top))] sm:px-5 sm:py-5 sm:pt-[calc(1.25rem+env(safe-area-inset-top))] md:px-8 md:py-5">
+      <span aria-hidden="true"/>
+      <button onClick={() => setView("home")} className="text-center"><span className="block font-editorial text-3xl font-semibold tracking-wide">Stillroom</span><span className="block text-[0.65rem] tracking-wide text-stone-500">A home for all your little worlds.</span></button>
       <button onClick={() => setDark(v => !v)} className="grid h-9 w-9 place-items-center rounded-full border line-border" aria-label={`Use ${dark ? "day" : "night"} theme`}>{dark ? <Sun size={17} /> : <Moon size={17} />}</button>
     </header>
-    {!showOnboarding && <nav aria-label="Main navigation" className="mx-auto mb-7 flex max-w-6xl flex-wrap gap-2 px-4 sm:px-5 md:px-8">{(["home","library","calendar"] as const).map(tab=><button key={tab} type="button" onClick={()=>setView(tab)} aria-current={view===tab?"page":undefined} className={"min-h-11 rounded-md border px-4 py-2 text-sm "+(view===tab?"border-stone-500 surface":"line-border")}>{tab==="library"?"Spaces":tab==="home"?"Home":"Calendar"}</button>)}</nav>}
-    {showOnboarding ? <section className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-xl items-center px-4 py-10 text-center sm:px-8"><div className="w-full"><p className="mb-4 text-xs uppercase tracking-[0.22em] onboarding-muted">Stillroom beta</p><h1 className="font-editorial text-4xl font-medium leading-tight sm:text-5xl md:text-6xl">Make yourself at home.</h1><p className="mx-auto mt-5 max-w-md text-base leading-7 onboarding-muted">A little room for everything on your mind.</p><div className="mx-auto mt-8 flex max-w-sm flex-col gap-3"><button type="button" onClick={createFirstSpace} className="min-h-12 w-full rounded-md onboarding-primary px-5 py-3 text-sm">Create your first Space</button><button type="button" onClick={exploreSamples} className="min-h-12 w-full rounded-md border line-border surface px-5 py-3 text-sm">Explore with sample Spaces</button></div><p className="mx-auto mt-7 max-w-lg text-xs leading-5 onboarding-muted">This beta stores data only in this browser. It does not sync across devices, and clearing browser data can erase your content. Please avoid storing sensitive information.</p></div></section> : (view === "home" || view === "calendar") ? <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-5 md:px-8"><div className="mb-7 border-b line-border pb-5"><h1 className="font-editorial text-4xl sm:text-5xl">{view==="home"?"Home":"Calendar"}</h1><p className="mt-2 text-sm text-stone-500">{view==="home"?"Your welcoming starting point. A glimpse of everything happening in your world.":"The days and moments that fill those rooms."}</p></div><HabitTracker spaces={data.spaces.filter(s=>!s.archived).map(s=>({id:s.id,name:s.name,accent:s.accent}))} compact={view==="home"}/></section> : view === "library" ? <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-5 md:px-8">
+    {!showOnboarding && <nav aria-label="Main navigation" className="mx-auto mb-7 flex max-w-6xl gap-2 overflow-x-auto px-4 sm:px-5 md:px-8">{(["home","library","calendar","capture"] as const).map(tab=><button key={tab} type="button" onClick={()=>setView(tab)} aria-current={view===tab || (tab === "library" && view === "space") ? "page" : undefined} className={"min-h-11 shrink-0 rounded-md border px-4 py-2 text-sm "+(view===tab || (tab === "library" && view === "space")?"border-stone-500 surface":"line-border")}>{tab==="library"?"Spaces":tab==="home"?"Home":tab==="calendar"?"Calendar":"Capture"}</button>)}</nav>}
+    {showOnboarding ? <section className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-xl items-center px-4 py-10 text-center sm:px-8"><div className="w-full"><p className="mb-4 text-xs uppercase tracking-[0.22em] onboarding-muted">Stillroom beta</p><h1 className="font-editorial text-4xl font-medium leading-tight sm:text-5xl md:text-6xl">Make yourself at home.</h1><p className="mx-auto mt-5 max-w-md text-base leading-7 onboarding-muted">A little room for everything on your mind.</p><div className="mx-auto mt-8 flex max-w-sm flex-col gap-3"><button type="button" onClick={createFirstSpace} className="min-h-12 w-full rounded-md onboarding-primary px-5 py-3 text-sm">Create your first Space</button><button type="button" onClick={exploreSamples} className="min-h-12 w-full rounded-md border line-border surface px-5 py-3 text-sm">Explore with sample Spaces</button></div><p className="mx-auto mt-7 max-w-lg text-xs leading-5 onboarding-muted">This beta stores data only in this browser. It does not sync across devices, and clearing browser data can erase your content. Please avoid storing sensitive information.</p></div></section>
+      : view === "home" ? <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-5 md:px-8"><div className="mb-7 flex flex-wrap items-end justify-between gap-3 border-b line-border pb-5"><div><h1 className="font-editorial text-4xl sm:text-5xl">Home</h1><p className="mt-2 text-sm text-stone-500">Your welcoming starting point. A glimpse of everything happening in your world.</p></div><a href="#close-at-hand" className="min-h-11 rounded-md border line-border px-3 py-2 text-sm">Close at Hand</a></div><HomeDashboard data={data} spaces={data.spaces} selectedDate={calendarDate} onSelectDate={setCalendarDate} onOpenCalendar={() => setView("calendar")} onOpenItem={setItemEditor} onOpenSpace={openSpace}><HabitTracker spaces={data.spaces.filter(s=>!s.archived).map(s=>({id:s.id,name:s.name,accent:s.accent}))} compact/></HomeDashboard></section>
+      : view === "calendar" ? <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-5 md:px-8"><div className="mb-7 border-b line-border pb-5"><h1 className="font-editorial text-4xl sm:text-5xl">Calendar</h1><p className="mt-2 text-sm text-stone-500">The days and moments that fill those rooms.</p></div><CalendarWorkspace entries={data.calendarEntries ?? []} portraits={data.dayPortraits ?? []} tasks={data.items} spaces={data.spaces.filter(s=>!s.archived)} selectedDate={calendarDate} onSelectDate={setCalendarDate} onSaveEntry={saveCalendarEntry} onDeleteEntry={deleteCalendarEntry} onSavePortrait={savePortrait} onDeletePortrait={deletePortrait} onAddTask={openTaskEditor} onOpenItem={setItemEditor}/></section>
+      : view === "capture" ? <CaptureWorkspace entries={data.captureEntries ?? []} spaces={data.spaces.filter(s=>!s.archived)} onSave={saveCapture} onEdit={editCapture} onDelete={deleteCapture} onConvert={convertCapture}/>
+      : view === "library" ? <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-5 md:px-8">
       <div className="mb-8 flex flex-wrap items-end justify-between gap-x-4 gap-y-5 border-b line-border pb-7">
-        <div className="min-w-0"><p className="mb-2 text-xs uppercase tracking-[0.22em] text-stone-500">Your places</p><h1 className="font-editorial text-4xl font-medium sm:text-5xl md:text-6xl">Spaces</h1></div>
+        <div className="min-w-0"><p className="mb-2 text-xs uppercase tracking-[0.22em] text-stone-500">Your places</p><h1 className="font-editorial text-4xl font-medium sm:text-5xl md:text-6xl">Spaces</h1><p className="mt-2 max-w-2xl text-sm text-stone-500">The individual rooms of your life, each with its own purpose and personality.</p></div>
         <button onClick={() => setSpaceEditor("new") } className="flex h-11 shrink-0 items-center gap-2 rounded-md bg-stone-800 px-3 text-sm text-white dark:bg-stone-100 dark:text-stone-900 sm:px-4"><Plus size={17}/> Create Space</button>
       </div>
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -125,7 +165,7 @@ export function StillroomApp() {
       {spaces.length ? <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">{spaces.map((space, index) => <SpaceCard key={space.id} space={space} index={index} lastIndex={spaces.length - 1} showArchived={showArchived} onOpen={() => openSpace(space.id)} onReorder={direction => reorder(space.id, direction)} onEdit={() => setSpaceEditor(space)} onArchive={() => archiveSpace(space.id, !space.archived)}/>)}</div> : <Empty title={showArchived ? "No archived Spaces" : "No Spaces found"} text={showArchived ? "Archived Spaces will rest here." : "Create a Space to begin organizing your life."} action={!showArchived ? () => setSpaceEditor("new") : undefined}/>}
     </section> : activeSpace ? <SpaceView space={activeSpace} data={data} onBack={() => setView("library") } onEdit={() => setSpaceEditor(activeSpace)} createdTab={createdTab} onCreatedTabShown={() => setCreatedTab(null)} onAdd={setNewItemType} onEditItem={setItemEditor} onMove={(item, spaceId) => saveItem({ ...item, spaceId })} onTogglePin={item => saveItem({ ...item, pinned: !item.pinned })} onToggleTask={item => item.type === "task" && saveItem({ ...item, completed: !item.completed })} /> : null}
     {spaceEditor && <SpaceEditor value={spaceEditor === "new" ? null : spaceEditor} nextOrder={data.spaces.length} onCancel={() => setSpaceEditor(null)} onSave={persistSpace}/>}
-    {(newItemType || itemEditor) && <ItemEditor type={newItemType || itemEditor?.type || "task"} item={itemEditor} spaceId={activeId || data.spaces[0]?.id} spaces={data.spaces.filter(s => !s.archived)} availableTags={data.tags ?? []} onCancel={() => { setItemEditor(null); setNewItemType(null); }} onSave={saveItem} onDelete={deleteItem}/>}
+    {(newItemType || itemEditor) && <ItemEditor type={newItemType || itemEditor?.type || "task"} item={itemEditor} initialDate={newItemDate} spaceId={activeId || data.spaces[0]?.id} spaces={data.spaces.filter(s => !s.archived)} availableTags={data.tags ?? []} onCancel={() => { setItemEditor(null); setNewItemType(null); setNewItemDate(undefined); }} onSave={saveItem} onDelete={deleteItem}/>}
     {!showOnboarding && <footer className="mx-auto max-w-6xl border-t line-border px-4 py-6 text-xs leading-5 text-stone-500 sm:px-5 md:px-8">Prototype storage: changes are kept only in this browser’s local storage. This is temporary and not secure multi-device synchronization. Do not store sensitive data.</footer>}
   </main>;
 }
@@ -275,8 +315,8 @@ function ItemCard({ item, tags, spaces, onEdit, onMove, onTogglePin, onToggleTas
   </article>;
 }
 
-export function ItemEditor({ type, item, spaceId, spaces, availableTags = [], onCancel, onSave, onDelete }: { type: ItemType; item: ContentItem | null; spaceId: string; spaces: Space[]; availableTags?: Tag[]; onCancel: () => void; onSave: (item: ContentItem, tags?: Tag[]) => void; onDelete: (id: string) => void }) {
-  const [title, setTitle] = useState(item?.title || ""); const [targetSpace, setTargetSpace] = useState(item?.spaceId || spaceId); const [taskDescription, setTaskDescription] = useState(item?.type === "task" ? item.description || "" : ""); const [dueDate, setDueDate] = useState(item?.type === "task" ? item.dueDate || "" : ""); const [priority, setPriority] = useState<"low" | "medium" | "high">(item?.type === "task" ? item.priority : "medium"); const [completed, setCompleted] = useState(item?.type === "task" ? item.completed : false);
+export function ItemEditor({ type, item, initialDate, spaceId, spaces, availableTags = [], onCancel, onSave, onDelete }: { type: ItemType; item: ContentItem | null; initialDate?: string; spaceId: string; spaces: Space[]; availableTags?: Tag[]; onCancel: () => void; onSave: (item: ContentItem, tags?: Tag[]) => void; onDelete: (id: string) => void }) {
+  const [title, setTitle] = useState(item?.title || ""); const [targetSpace, setTargetSpace] = useState(item?.spaceId || spaceId); const [taskDescription, setTaskDescription] = useState(item?.type === "task" ? item.description || "" : ""); const [dueDate, setDueDate] = useState(item?.type === "task" ? item.dueDate || "" : initialDate || ""); const [priority, setPriority] = useState<"low" | "medium" | "high">(item?.type === "task" ? item.priority : "medium"); const [completed, setCompleted] = useState(item?.type === "task" ? item.completed : false);
   const [body, setBody] = useState(item?.type === "note" ? item.body : ""); const [url, setUrl] = useState(item?.type === "link" ? item.url : ""); const [notes, setNotes] = useState(item?.type === "link" ? item.notes ?? "" : ""); const [entries, setEntries] = useState<ListEntry[]>(item?.type === "list" ? item.entries : [{ id: createId(), text: "", checked: false }]); const [pinned, setPinned] = useState(item?.pinned || false); const [error, setError] = useState("");
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>(item?.type === "link" ? item.tagIds ?? [] : []);
   const [createdTags, setCreatedTags] = useState<Tag[]>([]);

@@ -62,6 +62,28 @@ describe("Stillroom repository", () => {
     expect(loaded.data).toEqual(seedData);
   });
 
+  it("migrates existing data to schema version 2 and preserves added calendar, portrait, and Capture records", async () => {
+    const storage = new MemoryStorage();
+    const repo = new LocalStillroomRepository(storage);
+    const olderData = { spaces: seedData.spaces, items: seedData.items, tags: [] };
+    storage.setItem(STORAGE_KEY, JSON.stringify(olderData));
+    const migrated = await repo.load();
+
+    expect(migrated.data.schemaVersion).toBe(2);
+    expect(migrated.data.calendarEntries).toEqual([]);
+    expect(migrated.data.dayPortraits).toEqual([]);
+    expect(migrated.data.captureEntries).toEqual([]);
+
+    const event = { id: "anniversary", type: "occasion" as const, date: "2026-10-23", title: "Anniversary", yearly: true, createdAt: "now", updatedAt: "now" };
+    const portrait = { id: "day-portrait", date: "2026-10-23", mood: "Lovely" as const, photoIds: ["photo-id"], updatedAt: "now" };
+    const capture = { id: "capture", text: "Remember the garden", createdAt: "now", updatedAt: "now" };
+    await repo.save({ ...migrated.data, calendarEntries: [event], dayPortraits: [portrait], captureEntries: [capture] });
+    const loaded = await repo.load();
+    expect(loaded.data).toMatchObject({ schemaVersion: 2, calendarEntries: [event], dayPortraits: [portrait], captureEntries: [capture] });
+    await repo.save({ ...loaded.data, calendarEntries: [{ ...event, title: "Updated anniversary" }], dayPortraits: [], captureEntries: [] });
+    expect((await repo.load()).data).toMatchObject({ calendarEntries: [{ ...event, title: "Updated anniversary" }], dayPortraits: [], captureEntries: [] });
+  });
+
   it("loads older Links with safe notes and tag defaults without rewriting stored data", async () => {
     const storage = new MemoryStorage();
     const legacy = {

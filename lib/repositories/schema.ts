@@ -1,4 +1,4 @@
-import { AppData, ContentItem, Space } from "@/lib/models";
+import { AppData, CalendarEntry, ContentItem, DayPortrait, Mood, Space } from "@/lib/models";
 import { normalizeTagRegistry } from "@/lib/tags";
 
 const record = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
@@ -12,7 +12,11 @@ export function isAppData(value: unknown): value is AppData {
     const ids = value.tags.map(tag => tag.id);
     if (new Set(ids).size !== ids.length) return false;
   }
-  return value.spaces.every(isSpace) && value.items.every(isItem);
+  return (value.schemaVersion === undefined || value.schemaVersion === 2)
+    && (value.calendarEntries === undefined || (Array.isArray(value.calendarEntries) && value.calendarEntries.every(isCalendarEntry)))
+    && (value.dayPortraits === undefined || (Array.isArray(value.dayPortraits) && value.dayPortraits.every(isDayPortrait)))
+    && (value.captureEntries === undefined || (Array.isArray(value.captureEntries) && value.captureEntries.every(isCaptureEntry)))
+    && value.spaces.every(isSpace) && value.items.every(isItem);
 }
 
 export function normalizeAppData(value: AppData): AppData {
@@ -23,7 +27,37 @@ export function normalizeAppData(value: AppData): AppData {
     if (item.type === "link") return { ...item, notes: item.notes ?? "", tagIds: tagIds ?? [] };
     return tagIds ? { ...item, tagIds } : item;
   });
-  return { ...value, spaces: value.spaces, items, tags };
+  return { ...value, schemaVersion: 2, spaces: value.spaces, items, tags, calendarEntries: value.calendarEntries ?? [], dayPortraits: value.dayPortraits ?? [], captureEntries: value.captureEntries ?? [] };
+}
+
+const moods: Mood[] = ["Lovely", "Good", "So-so", "Heavy", "Quiet"];
+const validDate = (value: unknown) => {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(year, month - 1, day, 12);
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+};
+const photoIds = (value: unknown) => value === undefined || Array.isArray(value) && value.every(string);
+const validMood = (value: unknown) => value === undefined || moods.includes(value as Mood);
+
+function isCalendarEntry(value: unknown): value is CalendarEntry {
+  if (!record(value) || !string(value.id) || !validDate(value.date) || !string(value.createdAt) || !string(value.updatedAt)) return false;
+  if (value.type !== "journal" && value.type !== "event" && value.type !== "occasion" && value.type !== "memory") return false;
+  return (value.title === undefined || string(value.title)) && (value.body === undefined || string(value.body))
+    && (value.time === undefined || string(value.time)) && (value.location === undefined || string(value.location))
+    && validMood(value.mood) && photoIds(value.photoIds) && (value.portraitId === undefined || string(value.portraitId)) && (value.spaceId === undefined || string(value.spaceId))
+    && (value.yearly === undefined || boolean(value.yearly)) && (value.reminderDays === undefined || typeof value.reminderDays === "number" && value.reminderDays >= 0);
+}
+
+function isDayPortrait(value: unknown): value is DayPortrait {
+  return record(value) && string(value.id) && validDate(value.date) && validMood(value.mood)
+    && (value.caption === undefined || string(value.caption)) && Array.isArray(value.photoIds)
+    && value.photoIds.every(string) && string(value.updatedAt);
+}
+
+function isCaptureEntry(value: unknown): value is { id: string; text: string; createdAt: string; updatedAt: string } {
+  return record(value) && string(value.id) && string(value.text) && value.text.trim().length > 0
+    && string(value.createdAt) && string(value.updatedAt);
 }
 
 function isTag(value: unknown): value is { id: string; name: string } {
