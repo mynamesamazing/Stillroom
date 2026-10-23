@@ -30,6 +30,20 @@ describe("Calendar and Catchall interactions", () => {
     await waitFor(() => expect(screen.queryByRole("form", { name: "Add occasion" })).toBeNull());
   });
 
+  it("saves optional event end times for Day Dial time-block arcs", async () => {
+    const onSave = renderCalendar();
+    fireEvent.click(screen.getByRole("button", { name: "+ Add to this day" }));
+    fireEvent.click(screen.getByRole("button", { name: "Appointment or event" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Title (optional)" }), { target: { value: "Studio visit" } });
+    fireEvent.change(screen.getByLabelText("Start time (optional)"), { target: { value: "09:30" } });
+    fireEvent.change(screen.getByLabelText("End time (optional)"), { target: { value: "10:30" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      type: "event", title: "Studio visit", time: "09:30", endTime: "10:30",
+    }));
+  });
+
   it("supports editing and deleting an existing journal entry", async () => {
     const entry: CalendarEntry = { id: "entry-1", type: "journal", date: "2026-10-23", title: "A note", body: "A calm day", createdAt: "now", updatedAt: "now" };
     const onSave = renderCalendar(vi.fn(async () => true), [entry]);

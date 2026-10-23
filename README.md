@@ -28,6 +28,7 @@ npm run build
 - Local storage is not secure, private, or synchronized across devices. Do not enter sensitive personal data, API keys, or secrets.
 - Link tags are stored in a workspace-wide registry and can be reused across Spaces. Unused tags are retained because tag rename/removal management is not part of this release; the registry is normalized to avoid duplicate names and orphaned Link references.
 - Calendar, journal, day portrait, and Catchall records use additive schema version 2 fields in the existing `stillroom-data-v1` key. Habit records continue using `stillroom-habits-v1`.
+- The Home Day Dial calculates sunrise and sunset on-device for the selected date and city. Browser geolocation is requested only after choosing **Use my location**; the selected city or device coordinates are stored in the separate `stillroom-daydial-location-v1` browser key and are never sent to a remote API. Browser storage is not encrypted, and clearing site data removes this preference. London is the labeled fallback. Calendar events can optionally include an end time for a visible time-block arc, and their dial markers are keyboard- and touch-adjustable.
 - Photos are compressed to a maximum 1600px edge and 1.5 MB per image, with a 12 MB upload limit and 32 MB browser-local photo budget. Image blobs live in the versioned `stillroom-private-media-v1` IndexedDB database; application records contain photo IDs only. Photos and all other prototype data remain local to this browser and are not synced or backed up.
 
 ## Milestone 0.1B

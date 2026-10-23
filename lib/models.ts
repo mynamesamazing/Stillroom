@@ -36,6 +36,7 @@ export interface CalendarEntry {
   title?: string;
   body?: string;
   time?: string;
+  endTime?: string;
   location?: string;
   mood?: Mood;
   photoIds?: string[];

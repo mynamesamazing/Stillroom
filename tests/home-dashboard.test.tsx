@@ -45,12 +45,13 @@ describe("Home dashboard", () => {
       ...seedData,
       items: [...seedData.items, { id: "dial-task", ownerId: null, spaceId: "studio", type: "task", title: "Prepare sketches", dueDate: "2026-10-24", completed: false, priority: "medium", pinned: false, createdAt: "now", updatedAt: "now" }],
       calendarEntries: [
-        { id: "dial-event-later", type: "event", date: "2026-10-24", title: "Studio visit", time: "09:30", location: "Studio", spaceId: "studio", createdAt: "now", updatedAt: "now" },
+        { id: "dial-event-later", type: "event", date: "2026-10-24", title: "Studio visit", time: "09:30", endTime: "10:30", location: "Studio", spaceId: "studio", createdAt: "now", updatedAt: "now" },
         { id: "dial-event-earlier", type: "event", date: "2026-10-24", title: "Breakfast", time: "06:00", spaceId: "home", createdAt: "now", updatedAt: "now" },
         { id: "dial-all-day", type: "occasion", date: "2026-10-24", title: "All-day occasion", spaceId: "home", createdAt: "now", updatedAt: "now" },
       ],
     };
-    render(<HomeDashboard data={data} spaces={data.spaces} selectedDate="2026-10-24" onSelectDate={onSelectDate} onOpenCalendar={onOpenCalendar} onOpenItem={vi.fn()} onOpenSpace={vi.fn()}/>);
+    const onSaveCalendarEntry = vi.fn(async () => true);
+    render(<HomeDashboard data={data} spaces={data.spaces} selectedDate="2026-10-24" onSelectDate={onSelectDate} onOpenCalendar={onOpenCalendar} onOpenItem={vi.fn()} onOpenSpace={vi.fn()} onSaveCalendarEntry={onSaveCalendarEntry}/>);
 
     const dial = screen.getByRole("region", { name: "Day Dial" });
     const dialButtons = within(dial);
@@ -59,17 +60,26 @@ describe("Home dashboard", () => {
     expect(screen.getAllByText("Prepare sketches").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Studio visit").length).toBeGreaterThan(0);
     const face = dial.querySelector("svg");
-    expect(face?.querySelectorAll("[data-hour-label]")).toHaveLength(24);
-    expect(face?.querySelector('[data-hour-label="0"]')?.textContent).toBe("00");
-    expect(face?.querySelector('[data-hour-label="6"]')?.textContent).toBe("06");
-    expect(face?.querySelector('[data-hour-label="12"]')?.textContent).toBe("12");
-    expect(face?.querySelector('[data-hour-label="18"]')?.textContent).toBe("18");
-    expect(face?.querySelector('[data-event-time="06:00"]')?.getAttribute("cx")).toBe("312");
+    expect(face?.querySelectorAll("[data-hour-marker]")).toHaveLength(24);
+    expect(face?.querySelectorAll("[data-hour-label]")).toHaveLength(8);
+    expect(face?.querySelector('[data-hour-label="0"]')?.textContent).toBe("12 AM");
+    expect(face?.querySelector('[data-hour-label="6"]')?.textContent).toBe("6 AM");
+    expect(face?.querySelector('[data-hour-label="12"]')?.textContent).toBe("12 PM");
+    expect(face?.querySelector('[data-hour-label="18"]')?.textContent).toBe("6 PM");
+    expect(face?.querySelector('[data-event-time="06:00"]')?.getAttribute("cx")).toBe("308");
     expect(face?.querySelectorAll("[data-event-time]")).toHaveLength(2);
+    expect(face?.querySelector('[data-event-arc="dial-event-later"]')).toBeTruthy();
+    expect(face?.querySelector('[data-solar-marker="sunrise"]')).toBeTruthy();
+    expect(face?.querySelector('[data-solar-marker="sunset"]')).toBeTruthy();
+    expect(face?.querySelector('[data-arc="daylight"]')).toBeTruthy();
+    expect(face?.querySelector('[data-arc="night"]')).toBeTruthy();
+    expect(screen.getByRole("slider", { name: "Studio visit start time" }).getAttribute("aria-valuetext")).toContain("9:30 AM");
+    fireEvent.keyDown(screen.getByRole("slider", { name: "Studio visit start time" }), { key: "ArrowUp" });
+    expect(onSaveCalendarEntry).toHaveBeenCalledWith(expect.objectContaining({ id: "dial-event-later", time: "09:45", endTime: "10:45" }));
     const eventList = screen.getByRole("list", { name: "Events for Saturday, October 24" });
     expect(within(eventList).getAllByRole("listitem").map(item => item.textContent)).toEqual([
-      "Breakfast06:00",
-      "Studio visitStudio09:30",
+      "Breakfast6:00 AM",
+      "Studio visitStudio9:30 AM – 10:30 AM",
       "All-day occasionAll day",
     ]);
 
@@ -114,7 +124,7 @@ describe("Home dashboard", () => {
 
     expect(screen.getByRole("heading", { name: "Saturday, October 24" })).toBeTruthy();
     expect(screen.getByRole("list", { name: "Events for Saturday, October 24" }).textContent).toContain("Studio visit");
-    expect(screen.getByRole("region", { name: "Day Dial" }).querySelector("svg title")?.textContent).toBe("24-hour Day Dial for Saturday, October 24");
+    expect(screen.getByRole("region", { name: "Day Dial" }).querySelector("svg title")?.textContent).toBe("12-hour Day Dial for Saturday, October 24");
 
     fireEvent.click(screen.getByRole("button", { name: "Previous day" }));
     expect(screen.getByRole("heading", { name: "Friday, October 23" })).toBeTruthy();

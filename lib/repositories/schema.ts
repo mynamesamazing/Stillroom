@@ -37,6 +37,7 @@ const validDate = (value: unknown) => {
   const date = new Date(year, month - 1, day, 12);
   return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
 };
+const validTime = (value: unknown) => typeof value === "string" && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
 const photoIds = (value: unknown) => value === undefined || Array.isArray(value) && value.every(string);
 const validMood = (value: unknown) => value === undefined || moods.includes(value as Mood);
 
@@ -44,7 +45,7 @@ function isCalendarEntry(value: unknown): value is CalendarEntry {
   if (!record(value) || !string(value.id) || !validDate(value.date) || !string(value.createdAt) || !string(value.updatedAt)) return false;
   if (value.type !== "journal" && value.type !== "event" && value.type !== "occasion" && value.type !== "memory") return false;
   return (value.title === undefined || string(value.title)) && (value.body === undefined || string(value.body))
-    && (value.time === undefined || string(value.time)) && (value.location === undefined || string(value.location))
+    && (value.time === undefined || string(value.time)) && (value.endTime === undefined || value.type === "event" && validTime(value.endTime)) && (value.location === undefined || string(value.location))
     && validMood(value.mood) && photoIds(value.photoIds) && (value.portraitId === undefined || string(value.portraitId)) && (value.spaceId === undefined || string(value.spaceId))
     && (value.yearly === undefined || boolean(value.yearly)) && (value.reminderDays === undefined || typeof value.reminderDays === "number" && value.reminderDays >= 0);
 }

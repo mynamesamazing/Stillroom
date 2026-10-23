@@ -5,7 +5,7 @@ import { AppData, CalendarEntry, ContentItem, Space, TaskItem } from "@/lib/mode
 import { dateLabel, entryOccursOnDate, localDateKey, parseLocalDate } from "@/lib/dates";
 import { DayDial } from "@/components/DayDial";
 
-export function HomeDashboard({ data, spaces, selectedDate, onSelectDate, onOpenCalendar, onOpenItem, onOpenSpace, children }: {
+export function HomeDashboard({ data, spaces, selectedDate, onSelectDate, onOpenCalendar, onOpenItem, onOpenSpace, onSaveCalendarEntry, children }: {
   data: AppData;
   spaces: Space[];
   selectedDate: string;
@@ -13,6 +13,7 @@ export function HomeDashboard({ data, spaces, selectedDate, onSelectDate, onOpen
   onOpenCalendar: () => void;
   onOpenItem: (item: ContentItem) => void;
   onOpenSpace: (spaceId: string) => void;
+  onSaveCalendarEntry?: (entry: CalendarEntry) => Promise<boolean>;
   children?: React.ReactNode;
 }) {
   const today = new Date();
@@ -32,7 +33,7 @@ export function HomeDashboard({ data, spaces, selectedDate, onSelectDate, onOpen
   const pinned = data.items.filter(item => item.pinned);
 
   return <div className="space-y-9">
-    <DayDial data={data} spaces={spaces} selectedDate={selectedDate} onSelectDate={onSelectDate} onOpenCalendar={onOpenCalendar}/>
+    <DayDial data={data} spaces={spaces} selectedDate={selectedDate} onSelectDate={onSelectDate} onOpenCalendar={onOpenCalendar} onSaveCalendarEntry={onSaveCalendarEntry}/>
     <section aria-labelledby="selected-day-content">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <h2 id="selected-day-content" className="font-editorial text-3xl">{dateLabel(selectedDay)}</h2>

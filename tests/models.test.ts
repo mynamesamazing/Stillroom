@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { seedData, emptyData, STORAGE_KEY, RECOVERY_KEY, LocalStillroomRepository } from "@/lib/repositories/localRepository";
 import { itemTypeTab, shouldShowOnboarding } from "@/components/StillroomApp";
 import { contrastRatio } from "@/lib/contrast";
+import { isAppData } from "@/lib/repositories/schema";
 
 class MemoryStorage implements Storage {
   private values = new Map<string, string>();
@@ -74,7 +75,7 @@ describe("Stillroom repository", () => {
     expect(migrated.data.dayPortraits).toEqual([]);
     expect(migrated.data.captureEntries).toEqual([]);
 
-    const event = { id: "anniversary", type: "occasion" as const, date: "2026-10-23", title: "Anniversary", yearly: true, createdAt: "now", updatedAt: "now" };
+    const event = { id: "event", type: "event" as const, date: "2026-10-23", title: "Appointment", time: "09:30", endTime: "10:30", createdAt: "now", updatedAt: "now" };
     const portrait = { id: "day-portrait", date: "2026-10-23", mood: "Lovely" as const, photoIds: ["photo-id"], updatedAt: "now" };
     const capture = { id: "capture", text: "Remember the garden", createdAt: "now", updatedAt: "now" };
     await repo.save({ ...migrated.data, calendarEntries: [event], dayPortraits: [portrait], captureEntries: [capture] });
@@ -167,6 +168,13 @@ describe("Stillroom repository", () => {
   it("returns a warning when storage is unavailable", async () => {
     const loaded = await new LocalStillroomRepository(null).load();
     expect(loaded.warning?.code).toBe("storage-unavailable");
+  });
+
+  it("accepts event end times and rejects invalid time-block values", () => {
+    const event = { id: "event", type: "event" as const, date: "2026-10-23", time: "09:30", endTime: "10:30", createdAt: "now", updatedAt: "now" };
+    expect(isAppData({ ...seedData, calendarEntries: [event] })).toBe(true);
+    expect(isAppData({ ...seedData, calendarEntries: [{ ...event, endTime: "25:00" }] })).toBe(false);
+    expect(isAppData({ ...seedData, calendarEntries: [{ ...event, type: "occasion", endTime: "10:30" }] })).toBe(false);
   });
 
   it("reports unavailable and quota write failures", async () => {
