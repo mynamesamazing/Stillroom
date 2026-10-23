@@ -36,7 +36,7 @@ describe("Home dashboard", () => {
     expect(onOpenSpace).toHaveBeenCalledWith("home");
   });
 
-  it("shows a selected day's dated tasks and calendar entries and navigates weeks", () => {
+  it("shows a circular 24-hour dial, timed events, and day navigation", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 9, 23, 12));
     const onSelectDate = vi.fn();
@@ -44,35 +44,81 @@ describe("Home dashboard", () => {
     const data: AppData = {
       ...seedData,
       items: [...seedData.items, { id: "dial-task", ownerId: null, spaceId: "studio", type: "task", title: "Prepare sketches", dueDate: "2026-10-24", completed: false, priority: "medium", pinned: false, createdAt: "now", updatedAt: "now" }],
-      calendarEntries: [{ id: "dial-event", type: "event", date: "2026-10-24", title: "Studio visit", spaceId: "studio", createdAt: "now", updatedAt: "now" }],
+      calendarEntries: [
+        { id: "dial-event-later", type: "event", date: "2026-10-24", title: "Studio visit", time: "09:30", location: "Studio", spaceId: "studio", createdAt: "now", updatedAt: "now" },
+        { id: "dial-event-earlier", type: "event", date: "2026-10-24", title: "Breakfast", time: "06:00", spaceId: "home", createdAt: "now", updatedAt: "now" },
+        { id: "dial-all-day", type: "occasion", date: "2026-10-24", title: "All-day occasion", spaceId: "home", createdAt: "now", updatedAt: "now" },
+      ],
     };
     render(<HomeDashboard data={data} spaces={data.spaces} selectedDate="2026-10-24" onSelectDate={onSelectDate} onOpenCalendar={onOpenCalendar} onOpenItem={vi.fn()} onOpenSpace={vi.fn()}/>);
 
     const dial = screen.getByRole("region", { name: "Day Dial" });
     const dialButtons = within(dial);
-    expect(dialButtons.getAllByRole("button").filter(button => button.hasAttribute("aria-pressed"))).toHaveLength(7);
     expect(screen.getByRole("heading", { name: "Day Dial" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Saturday, October 24" })).toBeTruthy();
     expect(screen.getAllByText("Prepare sketches").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Studio visit").length).toBeGreaterThan(0);
-    expect(dialButtons.getByRole("button", { name: "Saturday, October 24" }).getAttribute("aria-pressed")).toBe("true");
-    expect(dialButtons.getByRole("button", { name: "Saturday, October 24" }).querySelector("i")?.getAttribute("style")).toContain("rgb(95, 114, 87)");
-    expect(within(screen.getByLabelText("Choose a day")).getByRole("button", { name: "Sunday, October 25" })).toBeTruthy();
-    expect(screen.getByLabelText("Choose a day").className).toContain("overflow-x-auto");
-    expect(screen.getByLabelText("Choose a day").firstElementChild?.className).toContain("sm:grid-cols-7");
+    const face = dial.querySelector("svg");
+    expect(face?.querySelectorAll("[data-hour-label]")).toHaveLength(24);
+    expect(face?.querySelector('[data-hour-label="0"]')?.textContent).toBe("00");
+    expect(face?.querySelector('[data-hour-label="6"]')?.textContent).toBe("06");
+    expect(face?.querySelector('[data-hour-label="12"]')?.textContent).toBe("12");
+    expect(face?.querySelector('[data-hour-label="18"]')?.textContent).toBe("18");
+    expect(face?.querySelector('[data-event-time="06:00"]')?.getAttribute("cx")).toBe("312");
+    expect(face?.querySelectorAll("[data-event-time]")).toHaveLength(2);
+    const eventList = screen.getByRole("list", { name: "Events for Saturday, October 24" });
+    expect(within(eventList).getAllByRole("listitem").map(item => item.textContent)).toEqual([
+      "Breakfast06:00",
+      "Studio visitStudio09:30",
+      "All-day occasionAll day",
+    ]);
 
-    fireEvent.click(screen.getByRole("button", { name: "Sunday, October 25" }));
+    fireEvent.click(dialButtons.getByRole("button", { name: "Previous day" }));
+    expect(onSelectDate).toHaveBeenCalledWith("2026-10-23");
+    fireEvent.click(dialButtons.getByRole("button", { name: "Next day" }));
     expect(onSelectDate).toHaveBeenCalledWith("2026-10-25");
     expect(onOpenCalendar).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Previous week" }));
-    expect(onSelectDate).toHaveBeenCalledWith("2026-10-17");
-    fireEvent.click(screen.getByRole("button", { name: "Next week" }));
-    expect(onSelectDate).toHaveBeenCalledWith("2026-10-31");
     fireEvent.click(screen.getByRole("button", { name: "Today" }));
     expect(onSelectDate).toHaveBeenCalledWith("2026-10-23");
 
-    fireEvent.click(screen.getByRole("button", { name: "Open this day in Calendar" }));
+    fireEvent.click(dialButtons.getByRole("button", { name: "Open calendar" }));
     expect(onOpenCalendar).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "Open this day in Calendar" }));
+    expect(onOpenCalendar).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows a current-time hand for today and an empty state without timed events", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 23, 13, 30));
+    render(<HomeDashboard data={seedData} spaces={seedData.spaces} selectedDate="2026-10-23" onSelectDate={vi.fn()} onOpenCalendar={vi.fn()} onOpenItem={vi.fn()} onOpenSpace={vi.fn()}/>);
+
+    expect(screen.getByText("No timed plans for this day. There's room for whatever comes.")).toBeTruthy();
+    expect(screen.getByLabelText(`Current time: ${new Date(2026, 9, 23, 13, 30).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`)).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Day Dial" }).querySelector("[data-current-time='true']")).toBeTruthy();
+  });
+
+  it("updates the dial and Home day content when another date is selected", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 23, 12));
+    const data: AppData = {
+      ...seedData,
+      calendarEntries: [{ id: "selected-event", type: "event", date: "2026-10-24", time: "09:30", title: "Studio visit", createdAt: "now", updatedAt: "now" }],
+    };
+    function InteractiveDashboard() {
+      const [selectedDate, setSelectedDate] = React.useState("2026-10-23");
+      return <HomeDashboard data={data} spaces={data.spaces} selectedDate={selectedDate} onSelectDate={setSelectedDate} onOpenCalendar={vi.fn()} onOpenItem={vi.fn()} onOpenSpace={vi.fn()}/>;
+    }
+
+    render(<InteractiveDashboard/>);
+    fireEvent.click(screen.getByRole("button", { name: "Next day" }));
+
+    expect(screen.getByRole("heading", { name: "Saturday, October 24" })).toBeTruthy();
+    expect(screen.getByRole("list", { name: "Events for Saturday, October 24" }).textContent).toContain("Studio visit");
+    expect(screen.getByRole("region", { name: "Day Dial" }).querySelector("svg title")?.textContent).toBe("24-hour Day Dial for Saturday, October 24");
+
+    fireEvent.click(screen.getByRole("button", { name: "Previous day" }));
+    expect(screen.getByRole("heading", { name: "Friday, October 23" })).toBeTruthy();
+    expect(screen.getByText("No timed plans for this day. There's room for whatever comes.")).toBeTruthy();
   });
 
   it("opens the selected calendar date from an upcoming occasion", () => {
