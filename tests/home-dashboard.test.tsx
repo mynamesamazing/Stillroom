@@ -36,6 +36,36 @@ describe("Home dashboard", () => {
     expect(onOpenSpace).toHaveBeenCalledWith("home");
   });
 
+  it("shows a selected day's dated tasks and calendar entries and navigates weeks", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 23, 12));
+    const onSelectDate = vi.fn();
+    const onOpenCalendar = vi.fn();
+    const data: AppData = {
+      ...seedData,
+      items: [...seedData.items, { id: "dial-task", ownerId: null, spaceId: "studio", type: "task", title: "Prepare sketches", dueDate: "2026-10-24", completed: false, priority: "medium", pinned: false, createdAt: "now", updatedAt: "now" }],
+      calendarEntries: [{ id: "dial-event", type: "event", date: "2026-10-24", title: "Studio visit", spaceId: "studio", createdAt: "now", updatedAt: "now" }],
+    };
+    render(<HomeDashboard data={data} spaces={data.spaces} selectedDate="2026-10-24" onSelectDate={onSelectDate} onOpenCalendar={onOpenCalendar} onOpenItem={vi.fn()} onOpenSpace={vi.fn()}/>);
+
+    expect(screen.getByRole("heading", { name: "Day Dial" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Saturday, October 24" })).toBeTruthy();
+    expect(screen.getAllByText("Prepare sketches").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Studio visit").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Sunday, October 25" }));
+    expect(onSelectDate).toHaveBeenCalledWith("2026-10-25");
+    fireEvent.click(screen.getByRole("button", { name: "Previous week" }));
+    expect(onSelectDate).toHaveBeenCalledWith("2026-10-17");
+    fireEvent.click(screen.getByRole("button", { name: "Next week" }));
+    expect(onSelectDate).toHaveBeenCalledWith("2026-10-31");
+    fireEvent.click(screen.getByRole("button", { name: "Today" }));
+    expect(onSelectDate).toHaveBeenCalledWith("2026-10-23");
+
+    fireEvent.click(screen.getByRole("button", { name: "Open this day in Calendar" }));
+    expect(onOpenCalendar).toHaveBeenCalledOnce();
+  });
+
   it("opens the selected calendar date from an upcoming occasion", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 9, 23, 12));

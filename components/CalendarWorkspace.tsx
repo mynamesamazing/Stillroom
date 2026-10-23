@@ -27,7 +27,9 @@ export function CalendarWorkspace({ entries, portraits, tasks, spaces, selectedD
   const [editingPortrait, setEditingPortrait] = useState(false);
   const [habitCreateSignal, setHabitCreateSignal] = useState(0);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
-  const [month, setMonth] = useState(() => parseLocalDate(selectedDate));
+  const [monthState, setMonthState] = useState(() => ({ selectedDate, month: parseLocalDate(selectedDate) }));
+  const month = monthState.selectedDate === selectedDate ? monthState.month : parseLocalDate(selectedDate);
+  const setMonth = (nextMonth: Date) => setMonthState({ selectedDate, month: nextMonth });
   const day = parseLocalDate(selectedDate);
   const dates = mode === "month" ? monthDates(month) : Array.from({ length: 7 }, (_, index) => addDays(day, index - ((day.getDay() + 6) % 7)));
   const dateEntries = entries.filter(entry => entryOccursOnDate(entry, day)).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));

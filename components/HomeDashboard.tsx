@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { AppData, CalendarEntry, ContentItem, Space } from "@/lib/models";
+import { AppData, CalendarEntry, ContentItem, Space, TaskItem } from "@/lib/models";
 import { addDays, dateLabel, entryOccursOnDate, localDateKey, parseLocalDate } from "@/lib/dates";
 
 export function HomeDashboard({ data, spaces, selectedDate, onSelectDate, onOpenCalendar, onOpenItem, onOpenSpace, children }: {
@@ -16,11 +16,15 @@ export function HomeDashboard({ data, spaces, selectedDate, onSelectDate, onOpen
 }) {
   const today = new Date();
   const todayKey = localDateKey(today);
-  const days = Array.from({ length: 7 }, (_, i) => addDays(today, i));
+  const selectedDay = parseLocalDate(selectedDate);
+  const weekStart = addDays(selectedDay, -((selectedDay.getDay() + 6) % 7));
+  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const selectedDayItems = data.items.filter((item): item is TaskItem => item.type === "task" && item.dueDate === selectedDate);
+  const entries = data.calendarEntries ?? [];
+  const selectedDayEntries = entries.filter(entry => entryOccursOnDate(entry, selectedDay));
   const tasks = data.items.filter(item => item.type === "task" && !item.completed && item.dueDate && item.dueDate >= todayKey)
     .sort((a, b) => (a.type === "task" ? a.dueDate ?? "" : "").localeCompare(b.type === "task" ? b.dueDate ?? "" : ""));
   const undatedTasks = data.items.filter(item => item.type === "task" && !item.completed && !item.dueDate);
-  const entries = data.calendarEntries ?? [];
   const monthEvents = entries.filter(entry => entry.type === "occasion" || entry.type === "event")
     .map(entry => ({ entry, date: entryOccursOnDate(entry, today) ? todayKey : entry.yearly ? nextOccurrence(entry, today) : entry.date }))
     .filter(value => value.date >= todayKey && value.date.slice(0, 7) === todayKey.slice(0, 7))
@@ -29,16 +33,43 @@ export function HomeDashboard({ data, spaces, selectedDate, onSelectDate, onOpen
   const pinned = data.items.filter(item => item.pinned);
 
   return <div className="space-y-9">
-    <section aria-labelledby="week-glance"><div className="mb-3 flex items-center justify-between"><h2 id="week-glance" className="font-editorial text-3xl">The week ahead</h2><button type="button" onClick={onOpenCalendar} className="min-h-11 px-2 text-sm underline underline-offset-4">Open calendar</button></div>
-      <div className="grid grid-cols-7 gap-1 sm:gap-2">{days.map(date => {
+    <section aria-labelledby="day-dial-title">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-3">
+          <h2 id="day-dial-title" className="font-editorial text-3xl">Day Dial</h2>
+          <div className="flex gap-1">
+            <button type="button" aria-label="Previous week" onClick={() => onSelectDate(localDateKey(addDays(selectedDay, -7)))} className="grid h-11 w-11 place-items-center rounded-md border line-border">‹</button>
+            <button type="button" aria-label="Next week" onClick={() => onSelectDate(localDateKey(addDays(selectedDay, 7)))} className="grid h-11 w-11 place-items-center rounded-md border line-border">›</button>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => onSelectDate(todayKey)} aria-current={selectedDate === todayKey ? "date" : undefined} className="min-h-11 px-2 text-sm underline underline-offset-4">Today</button>
+          <button type="button" onClick={onOpenCalendar} className="min-h-11 px-2 text-sm underline underline-offset-4">Open calendar</button>
+        </div>
+      </div>
+      <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+        <div className="grid min-w-[35rem] grid-cols-7 gap-2">
+          {days.map(date => {
         const key = localDateKey(date);
         const dayItems = data.items.filter(item => item.type === "task" && item.dueDate === key);
         const dayEntries = entries.filter(entry => entryOccursOnDate(entry, date));
-        return <button type="button" key={key} onClick={() => { onSelectDate(key); onOpenCalendar(); }} aria-label={dateLabel(date)} aria-pressed={key === selectedDate} className={`min-w-0 rounded-md border p-2 text-center sm:p-3 ${key === selectedDate ? "border-stone-500 surface" : "line-border"}`}>
+        return <button type="button" key={key} onClick={() => onSelectDate(key)} aria-label={dateLabel(date)} aria-pressed={key === selectedDate} className={`min-h-24 min-w-0 rounded-md border p-2 text-center transition-colors ${key === selectedDate ? "border-stone-500 surface ring-1 ring-stone-500" : "line-border"}`}>
           <span className="block text-[0.65rem] uppercase text-stone-500 sm:text-xs">{dateLabel(date, { weekday: "short" })}</span><span className="mt-1 block font-editorial text-xl sm:text-2xl">{date.getDate()}</span>
-          <span className="mt-1 flex min-h-2 justify-center gap-1">{[...dayItems.map(item => item.spaceId), ...dayEntries.map(entry => entry.spaceId)].slice(0, 3).map((spaceId, index) => <i key={`${key}-${index}`} className="h-1.5 w-1.5 rounded-full" style={{ background: spaces.find(space => space.id === spaceId)?.accent ?? "#827a6e" }}/>)}</span>
+          <span className="mt-2 flex min-h-2 justify-center gap-1">{[...dayItems.map(item => item.spaceId), ...dayEntries.map(entry => entry.spaceId)].slice(0, 4).map((spaceId, index) => <i key={`${key}-${index}`} aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ background: spaces.find(space => space.id === spaceId)?.accent ?? "#827a6e" }}/>)}</span>
         </button>;
-      })}</div>
+          })}
+        </div>
+      </div>
+    </section>
+    <section aria-labelledby="selected-day-content">
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+        <h2 id="selected-day-content" className="font-editorial text-3xl">{dateLabel(selectedDay)}</h2>
+        <button type="button" onClick={onOpenCalendar} className="min-h-11 px-2 text-sm underline underline-offset-4">Open this day in Calendar</button>
+      </div>
+      {selectedDayItems.length || selectedDayEntries.length ? <ul className="space-y-2">
+        {selectedDayItems.map(item => <li key={item.id}><button type="button" onClick={() => onOpenItem(item)} className="flex min-h-14 w-full items-center gap-3 rounded-md border line-border surface px-3 text-left"><span className="h-2 w-2 shrink-0 rounded-full" style={{ background: spaces.find(space => space.id === item.spaceId)?.accent ?? "#827a6e" }}/><span className="min-w-0 flex-1 truncate">{item.title}</span><span className="shrink-0 text-xs text-stone-500">{item.completed ? "Done" : "Task"}</span></button></li>)}
+        {selectedDayEntries.map(entry => <li key={entry.id}><button type="button" onClick={onOpenCalendar} className="flex min-h-14 w-full items-center gap-3 rounded-md border line-border surface px-3 text-left"><span className="h-2 w-2 shrink-0 rounded-full" style={{ background: spaces.find(space => space.id === entry.spaceId)?.accent ?? "#827a6e" }}/><span className="min-w-0 flex-1 truncate">{entry.title || entry.body || "Remember this day"}</span><span className="shrink-0 text-xs capitalize text-stone-500">{entry.type}</span></button></li>)}
+      </ul> : <p className="rounded-md border border-dashed line-border p-5 text-sm text-stone-500">Nothing dated for this day yet. Let the day unfold.</p>}
     </section>
     <section aria-labelledby="upcoming-tasks"><h2 id="upcoming-tasks" className="mb-3 font-editorial text-3xl">Today and coming up</h2>
       {tasks.length || undatedTasks.length ? <ul className="grid gap-2 sm:grid-cols-2">{[...tasks.slice(0, 8), ...undatedTasks.slice(0, 3)].map(item => <li key={item.id}><button type="button" onClick={() => onOpenItem(item)} className="flex min-h-14 w-full items-center gap-3 rounded-md border line-border surface px-3 text-left"><span className="h-2 w-2 shrink-0 rounded-full" style={{ background: spaces.find(space => space.id === item.spaceId)?.accent ?? "#827a6e" }}/><span className="min-w-0 flex-1 truncate">{item.title}</span><span className="shrink-0 text-xs text-stone-500">{item.type === "task" ? item.dueDate ?? "No date" : ""}</span></button></li>)}</ul> : <p className="rounded-md border border-dashed line-border p-5 text-sm text-stone-500">Nothing pressing. Let the day unfold.</p>}
