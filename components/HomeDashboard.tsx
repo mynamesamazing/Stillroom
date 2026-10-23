@@ -2,7 +2,8 @@
 
 import React from "react";
 import { AppData, CalendarEntry, ContentItem, Space, TaskItem } from "@/lib/models";
-import { addDays, dateLabel, entryOccursOnDate, localDateKey, parseLocalDate } from "@/lib/dates";
+import { dateLabel, entryOccursOnDate, localDateKey, parseLocalDate } from "@/lib/dates";
+import { DayDial } from "@/components/DayDial";
 
 export function HomeDashboard({ data, spaces, selectedDate, onSelectDate, onOpenCalendar, onOpenItem, onOpenSpace, children }: {
   data: AppData;
@@ -17,8 +18,6 @@ export function HomeDashboard({ data, spaces, selectedDate, onSelectDate, onOpen
   const today = new Date();
   const todayKey = localDateKey(today);
   const selectedDay = parseLocalDate(selectedDate);
-  const weekStart = addDays(selectedDay, -((selectedDay.getDay() + 6) % 7));
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const selectedDayItems = data.items.filter((item): item is TaskItem => item.type === "task" && item.dueDate === selectedDate);
   const entries = data.calendarEntries ?? [];
   const selectedDayEntries = entries.filter(entry => entryOccursOnDate(entry, selectedDay));
@@ -33,34 +32,7 @@ export function HomeDashboard({ data, spaces, selectedDate, onSelectDate, onOpen
   const pinned = data.items.filter(item => item.pinned);
 
   return <div className="space-y-9">
-    <section aria-labelledby="day-dial-title">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-3">
-          <h2 id="day-dial-title" className="font-editorial text-3xl">Day Dial</h2>
-          <div className="flex gap-1">
-            <button type="button" aria-label="Previous week" onClick={() => onSelectDate(localDateKey(addDays(selectedDay, -7)))} className="grid h-11 w-11 place-items-center rounded-md border line-border">‹</button>
-            <button type="button" aria-label="Next week" onClick={() => onSelectDate(localDateKey(addDays(selectedDay, 7)))} className="grid h-11 w-11 place-items-center rounded-md border line-border">›</button>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={() => onSelectDate(todayKey)} aria-current={selectedDate === todayKey ? "date" : undefined} className="min-h-11 px-2 text-sm underline underline-offset-4">Today</button>
-          <button type="button" onClick={onOpenCalendar} className="min-h-11 px-2 text-sm underline underline-offset-4">Open calendar</button>
-        </div>
-      </div>
-      <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-        <div className="grid min-w-[35rem] grid-cols-7 gap-2">
-          {days.map(date => {
-        const key = localDateKey(date);
-        const dayItems = data.items.filter(item => item.type === "task" && item.dueDate === key);
-        const dayEntries = entries.filter(entry => entryOccursOnDate(entry, date));
-        return <button type="button" key={key} onClick={() => onSelectDate(key)} aria-label={dateLabel(date)} aria-pressed={key === selectedDate} className={`min-h-24 min-w-0 rounded-md border p-2 text-center transition-colors ${key === selectedDate ? "border-stone-500 surface ring-1 ring-stone-500" : "line-border"}`}>
-          <span className="block text-[0.65rem] uppercase text-stone-500 sm:text-xs">{dateLabel(date, { weekday: "short" })}</span><span className="mt-1 block font-editorial text-xl sm:text-2xl">{date.getDate()}</span>
-          <span className="mt-2 flex min-h-2 justify-center gap-1">{[...dayItems.map(item => item.spaceId), ...dayEntries.map(entry => entry.spaceId)].slice(0, 4).map((spaceId, index) => <i key={`${key}-${index}`} aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ background: spaces.find(space => space.id === spaceId)?.accent ?? "#827a6e" }}/>)}</span>
-        </button>;
-          })}
-        </div>
-      </div>
-    </section>
+    <DayDial data={data} spaces={spaces} selectedDate={selectedDate} onSelectDate={onSelectDate} onOpenCalendar={onOpenCalendar}/>
     <section aria-labelledby="selected-day-content">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <h2 id="selected-day-content" className="font-editorial text-3xl">{dateLabel(selectedDay)}</h2>

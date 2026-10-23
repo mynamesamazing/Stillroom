@@ -1,5 +1,5 @@
 import React from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HomeDashboard } from "@/components/HomeDashboard";
 import { AppData, CalendarEntry } from "@/lib/models";
@@ -48,13 +48,22 @@ describe("Home dashboard", () => {
     };
     render(<HomeDashboard data={data} spaces={data.spaces} selectedDate="2026-10-24" onSelectDate={onSelectDate} onOpenCalendar={onOpenCalendar} onOpenItem={vi.fn()} onOpenSpace={vi.fn()}/>);
 
+    const dial = screen.getByRole("region", { name: "Day Dial" });
+    const dialButtons = within(dial);
+    expect(dialButtons.getAllByRole("button").filter(button => button.hasAttribute("aria-pressed"))).toHaveLength(7);
     expect(screen.getByRole("heading", { name: "Day Dial" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Saturday, October 24" })).toBeTruthy();
     expect(screen.getAllByText("Prepare sketches").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Studio visit").length).toBeGreaterThan(0);
+    expect(dialButtons.getByRole("button", { name: "Saturday, October 24" }).getAttribute("aria-pressed")).toBe("true");
+    expect(dialButtons.getByRole("button", { name: "Saturday, October 24" }).querySelector("i")?.getAttribute("style")).toContain("rgb(95, 114, 87)");
+    expect(within(screen.getByLabelText("Choose a day")).getByRole("button", { name: "Sunday, October 25" })).toBeTruthy();
+    expect(screen.getByLabelText("Choose a day").className).toContain("overflow-x-auto");
+    expect(screen.getByLabelText("Choose a day").firstElementChild?.className).toContain("sm:grid-cols-7");
 
     fireEvent.click(screen.getByRole("button", { name: "Sunday, October 25" }));
     expect(onSelectDate).toHaveBeenCalledWith("2026-10-25");
+    expect(onOpenCalendar).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Previous week" }));
     expect(onSelectDate).toHaveBeenCalledWith("2026-10-17");
     fireEvent.click(screen.getByRole("button", { name: "Next week" }));
