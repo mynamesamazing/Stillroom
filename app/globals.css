@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { --background: 247 244 237; --foreground: 41 39 36; --muted: 113 109 102; --line: 223 217 205; --surface: 252 250 245; }
+.dark { --background: 37 36 33; --foreground: 238 235 226; --muted: 173 168 157; --line: 70 68 63; --surface: 43 42 38; }
+* { box-sizing: border-box; }
+html { background: rgb(var(--background)); }
+body { margin: 0; min-height: 100vh; background: rgb(var(--background)); color: rgb(var(--foreground)); font-family: var(--font-inter), sans-serif; }
+button, input, textarea, select { font: inherit; }
+button { cursor: pointer; }
+.font-editorial { font-family: var(--font-cormorant), serif; }
+.surface { background: rgb(var(--surface)); }
+.line-border { border-color: rgb(var(--line)); }
+.content-tab { color: rgb(var(--muted)); }
+.content-tab:hover { color: rgb(var(--foreground)); }
+.content-tab[data-selected="true"] { color: rgb(var(--foreground)); background: rgb(var(--surface)); border-bottom-color: rgb(var(--foreground)); }
+::selection { background: #d7c5ad; color: #292724; }
+:focus-visible { outline: 2px solid #796d50; outline-offset: 2px; }
+input, textarea, select { color: rgb(var(--foreground)); }
+input::placeholder, textarea::placeholder { color: rgb(var(--muted)); }
