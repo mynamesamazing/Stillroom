@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
 
 type Period = "daily" | "weekly" | "monthly";
@@ -16,9 +16,18 @@ const classes = "rounded-md border line-border bg-transparent px-3 py-2 text-sm"
 const sample = (h: Habit): Habit => ({...h,logs:[...h.logs]});
 
 export function HabitTracker({ spaces, compact=false }: {spaces: {id:string;name:string;accent:string}[];compact?:boolean}) {
-  const [habits,setHabits]=useState<Habit[]>([]);
-  const [ready,setReady]=useState(false);
-  const [warning,setWarning]=useState("");
+  const [initial] = useState<{habits: Habit[]; warning: string}>(() => {
+    if (typeof window === "undefined") return { habits: [], warning: "" };
+    try {
+      const raw = window.localStorage.getItem(KEY);
+      if (!raw) return { habits: [], warning: "" };
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed) || !parsed.every((h: unknown) => !!h && typeof h === "object" && "id" in h && "logs" in h && Array.isArray(h.logs))) throw new Error("Invalid tracker data");
+      return { habits: parsed as Habit[], warning: "" };
+    } catch { return { habits: [], warning: "Saved habit data could not be read. It has not been overwritten." }; }
+  });
+  const [habits,setHabits]=useState<Habit[]>(initial.habits);
+  const [warning,setWarning]=useState(initial.warning);
   const [editing,setEditing]=useState<string|null>(null);
   const [name,setName]=useState("");
   const [mode,setMode]=useState<Mode>("quantity");
@@ -31,7 +40,6 @@ export function HabitTracker({ spaces, compact=false }: {spaces: {id:string;name
   const [manual,setManual]=useState<Record<string,string>>({});
   const [selectedDate,setSelectedDate]=useState(dateKey(new Date()));
   const [historyId,setHistoryId]=useState<string|null>(null);
-  useEffect(()=>{try { const raw=localStorage.getItem(KEY); if(raw){const parsed:unknown=JSON.parse(raw); if(!Array.isArray(parsed)) throw Error("Invalid tracker data"); const valid=parsed.every((h:unknown)=>!!h && typeof h==="object" && "id" in h && "logs" in h && Array.isArray(h.logs)); if(!valid) throw Error("Invalid tracker data"); setHabits(parsed as Habit[]);} } catch {setWarning("Saved habit data could not be read. It has not been overwritten.");} setReady(true);},[]);
   const save=(next:Habit[])=>{if(warning) return; try{localStorage.setItem(KEY,JSON.stringify(next));setHabits(next);}catch{setWarning("Habit changes could not be saved. Check browser storage.");}};
   const date=useMemo(()=>new Date(selectedDate+"T12:00:00"),[selectedDate]);
   const startEdit=(h?:Habit)=>{setEditing(h?.id??"new");setName(h?.name??"");setMode(h?.mode??"quantity");setUnit(h?.unit??"oz");setGoal(String(h?.goal??80));setPeriod(h?.period??"daily");setBenchmarks(h?.benchmarks.join(", ")??"8, 16, 24");setSpaceId(h?.spaceId??"");setLogMode(h?.logMode??"add");};
@@ -39,7 +47,6 @@ export function HabitTracker({ spaces, compact=false }: {spaces: {id:string;name
   const log=(h:Habit,amount:number,when=selectedDate)=>{if(!Number.isFinite(amount)||amount<0) return; const entry:Log={id:uid(),date:when,amount,createdAt:new Date().toISOString()};const next=sample(h);if(h.mode==="check"){const start=periodStart(new Date(when+"T12:00:00"),h.period);next.logs=next.logs.filter(l=>periodStart(new Date(l.date+"T12:00:00"),h.period)!==start);if(amount)next.logs.push(entry);}else next.logs.push(entry);save(habits.map(x=>x.id===h.id?next:x));};
   const updateLog=(h:Habit,id:string,amount:number)=>{if(!Number.isFinite(amount)||amount<0)return;save(habits.map(x=>x.id===h.id?{...h,logs:h.logs.map(l=>l.id===id?{...l,amount}:l)}:x));};
   const deleteLog=(h:Habit,id:string)=>save(habits.map(x=>x.id===h.id?{...h,logs:h.logs.filter(l=>l.id!==id)}:x));
-  if(!ready)return <p className="text-sm text-stone-500">Opening habits…</p>;
   return <section className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-editorial text-3xl">Little things, often.</h2><p className="text-sm text-stone-500">A few things you’re tending to.</p></div><button className={classes+" flex items-center gap-2"} onClick={()=>startEdit()}><Plus size={16}/> New habit</button></div>
     {warning&&<p role="alert" className="rounded-md border border-amber-500 p-3 text-sm">{warning} <button className="underline" onClick={()=>setWarning("")}>Dismiss</button></p>}
