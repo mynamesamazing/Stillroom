@@ -123,6 +123,6 @@ describe("editor dialog keyboard behavior", () => {
     fireEvent.change(url, { target: { value: "https://example.com" } });
     fireEvent.click(screen.getByRole("button", { name: "Add link" }));
 
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ type: "link", url: "https://example.com" }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ type: "link", url: "https://example.com", notes: "", tagIds: [] }), []);
   });
 });

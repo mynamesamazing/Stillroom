@@ -38,7 +38,14 @@ describe("Space view mobile navigation and empty states", () => {
     expect(row?.className).toContain("min-w-0");
     expect(tablist.className).toContain("overflow-x-auto");
     expect(search.parentElement?.parentElement).toBe(tablist.parentElement?.parentElement);
-    expect(newAction.className).toContain("h-12");
+    expect(newAction.className).toContain("h-11");
+    expect(newAction.className).toContain("shrink-0");
+    expect(newAction.className).toContain("px-2");
+    expect(newAction.className).toContain("border");
+    expect(newAction.className).toContain("sm:h-10");
+    expect(newAction.className).toContain("sm:px-4");
+    expect(newAction.className).toContain("sm:bg-stone-800");
+    expect(newAction.className).toContain("dark:sm:bg-stone-100");
   });
 
   it.each([
@@ -46,12 +53,38 @@ describe("Space view mobile navigation and empty states", () => {
     ["Notes", "Create a Note", "note"],
     ["Lists", "Create a List", "list"],
     ["Links", "Add a Link", "link"],
-    ["Overview", "Create a Task", "task"],
   ] as const)("uses the %s empty-state action and creates the matching type", (tab, label, itemType) => {
     const onAdd = renderEmptySpace();
     fireEvent.click(screen.getByRole("tab", { name: tab }));
     fireEvent.click(screen.getByRole("button", { name: label }));
 
     expect(onAdd).toHaveBeenCalledWith(itemType);
+  });
+
+  it("shows the Overview empty state without a creation action", () => {
+    renderEmptySpace();
+
+    expect(screen.getByRole("heading", { name: "Nothing pinned yet" })).toBeTruthy();
+    expect(screen.getByText("Pin useful things so they stay close at hand.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Create|Add/ })).toBeNull();
+  });
+
+  it("continues to show pinned items on the Overview dashboard", () => {
+    render(<SpaceView
+      space={seedData.spaces[0]}
+      data={seedData}
+      onBack={vi.fn()}
+      onEdit={vi.fn()}
+      createdTab={null}
+      onCreatedTabShown={vi.fn()}
+      onAdd={vi.fn()}
+      onEditItem={vi.fn()}
+      onMove={vi.fn()}
+      onTogglePin={vi.fn()}
+      onToggleTask={vi.fn()}
+    />);
+
+    expect(screen.getByRole("button", { name: /Plan the week/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Autumn supper notes/ })).toBeTruthy();
   });
 });

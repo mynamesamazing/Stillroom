@@ -26,6 +26,7 @@ npm run build
 - UI behavior is in `components/StillroomApp.tsx`; persistence is behind `lib/repositories/types.ts`.
 - `lib/repositories/localRepository.ts` is the prototype implementation and can be replaced with Supabase without changing UI contracts.
 - Local storage is not secure, private, or synchronized across devices. Do not enter sensitive personal data, API keys, or secrets.
+- Link tags are stored in a workspace-wide registry and can be reused across Spaces. Unused tags are retained because tag rename/removal management is not part of this release; the registry is normalized to avoid duplicate names and orphaned Link references.
 
 ## Milestone 0.1B
 

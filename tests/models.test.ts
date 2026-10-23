@@ -62,6 +62,71 @@ describe("Stillroom repository", () => {
     expect(loaded.data).toEqual(seedData);
   });
 
+  it("loads older Links with safe notes and tag defaults without rewriting stored data", async () => {
+    const storage = new MemoryStorage();
+    const legacy = {
+      spaces: seedData.spaces,
+      items: seedData.items.map(item => {
+        if (item.type !== "link") return item;
+        return {
+          id: item.id,
+          ownerId: item.ownerId,
+          spaceId: item.spaceId,
+          type: item.type,
+          title: item.title,
+          url: item.url,
+          pinned: item.pinned,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+        };
+      }),
+    };
+    const raw = JSON.stringify(legacy);
+    storage.setItem(STORAGE_KEY, raw);
+
+    const loaded = await new LocalStillroomRepository(storage).load();
+    const link = loaded.data.items.find(item => item.type === "link");
+
+    expect(loaded.warning).toBeUndefined();
+    expect(loaded.data.tags).toEqual([]);
+    expect(link).toMatchObject({ notes: "", tagIds: [] });
+    expect(loaded.data.spaces).toEqual(seedData.spaces);
+    expect(storage.getItem(STORAGE_KEY)).toBe(raw);
+  });
+
+  it("persists and reuses one workspace tag across Links in different Spaces", async () => {
+    const storage = new MemoryStorage();
+    const repo = new LocalStillroomRepository(storage);
+    const tag = { id: "custom-reading", name: "Weekend reading" };
+    const links = [
+      { id: "link-home", ownerId: null, spaceId: "home", type: "link" as const, title: "Essay", url: "https://example.com/essay", notes: "Read on Sunday", tagIds: [tag.id], pinned: false, createdAt: "2026-01-01", updatedAt: "2026-01-01" },
+      { id: "link-studio", ownerId: null, spaceId: "studio", type: "link" as const, title: "Research", url: "https://example.com/research", notes: "", tagIds: [tag.id], pinned: false, createdAt: "2026-01-01", updatedAt: "2026-01-01" },
+    ];
+
+    await repo.save({ ...emptyData, spaces: seedData.spaces.slice(0, 2), items: links, tags: [tag] });
+    const loaded = await repo.load();
+
+    expect(loaded.data.tags).toEqual([tag]);
+    expect(loaded.data.items.filter(item => item.type === "link").map(item => item.tagIds)).toEqual([[tag.id], [tag.id]]);
+  });
+
+  it("normalizes duplicate tag names and keeps Link references valid", async () => {
+    const storage = new MemoryStorage();
+    const repo = new LocalStillroomRepository(storage);
+    const link = seedData.items.find(item => item.type === "link");
+    if (!link || link.type !== "link") throw new Error("Seed Link missing.");
+
+    await repo.save({
+      ...seedData,
+      tags: [{ id: "tag-first", name: "  Read   Later " }, { id: "tag-duplicate", name: "read later" }],
+      items: [{ ...link, tagIds: ["tag-first", "tag-duplicate", "missing-tag"] }],
+    });
+    const loaded = await repo.load();
+
+    expect(loaded.data.tags).toEqual([{ id: "tag-first", name: "Read Later" }]);
+    expect(loaded.data.items[0]).toMatchObject({ type: "link", tagIds: ["tag-first"] });
+  });
+
   it("preserves invalid JSON without overwriting it", async () => {
     const storage = new MemoryStorage(); storage.setItem(STORAGE_KEY, "{broken");
     const loaded = await new LocalStillroomRepository(storage).load();

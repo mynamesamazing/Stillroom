@@ -21,6 +21,11 @@ export interface ListEntry {
   checked: boolean;
 }
 
+export interface Tag {
+  id: string;
+  name: string;
+}
+
 export interface BaseItem {
   id: string;
   ownerId: string | null;
@@ -28,6 +33,7 @@ export interface BaseItem {
   type: ItemType;
   title: string;
   pinned: boolean;
+  tagIds?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -35,10 +41,10 @@ export interface BaseItem {
 export interface TaskItem extends BaseItem { type: "task"; description?: string; dueDate?: string; completed: boolean; priority: Priority }
 export interface NoteItem extends BaseItem { type: "note"; body: string }
 export interface ListItem extends BaseItem { type: "list"; entries: ListEntry[] }
-export interface LinkItem extends BaseItem { type: "link"; url: string }
+export interface LinkItem extends BaseItem { type: "link"; url: string; notes?: string }
 export type ContentItem = TaskItem | NoteItem | ListItem | LinkItem;
 
-export interface AppData { spaces: Space[]; items: ContentItem[] }
+export interface AppData { spaces: Space[]; items: ContentItem[]; tags?: Tag[] }
 
 export const now = () => new Date().toISOString();
 export const createId = () => typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
